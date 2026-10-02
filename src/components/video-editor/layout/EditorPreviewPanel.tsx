@@ -18,7 +18,7 @@ import {
 	SpeakerX,
 } from "@/components/ui/icons";
 import { Lightning } from "@phosphor-icons/react";
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import { useState, useEffect, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -43,6 +43,15 @@ import { EditorVideoPreview } from "./EditorVideoPreview";
 import { KeystrokeVisualizer } from "../keystrokes/KeystrokeVisualizer";
 import { detectSilenceGapsFromCues, computeAutoTrimmedClips } from "../timeline/autoSilenceCutter";
 import { toast } from "@/components/ui/toast";
+import { SwissKnifeToolbar } from "../swissknife/SwissKnifeToolbar";
+import { SpotlightOverlay, type SpotlightMode } from "../swissknife/SpotlightOverlay";
+import { PrivacyBlurOverlay, type PrivacyMask } from "../swissknife/PrivacyBlurOverlay";
+import type { ChapterMarker } from "../swissknife/ChapterMarkersModal";
+import {
+	DEFAULT_VOICE_ENHANCER_OPTIONS,
+	type VoiceEnhancerOptions,
+	studioVoiceEnhancer,
+} from "../swissknife/StudioVoiceEnhancer";
 
 type Props = {
 	t: ReturnType<typeof useI18n>["t"];
@@ -122,6 +131,26 @@ export function EditorPreviewPanel(props: Props) {
 		setError,
 	} = props;
 
+	// Swiss Army Knife Suite State
+	const [spotlightMode, setSpotlightMode] = useState<SpotlightMode>("off");
+	const [privacyMasks, setPrivacyMasks] = useState<PrivacyMask[]>([]);
+	const [chapters, setChapters] = useState<ChapterMarker[]>([
+		{ id: "ch_intro", timeSeconds: 0, title: "Introduction" },
+	]);
+	const [voiceEnhancerOptions, setVoiceEnhancerOptions] = useState<VoiceEnhancerOptions>(
+		DEFAULT_VOICE_ENHANCER_OPTIONS,
+	);
+
+	// Attach / update Web Audio DSP filter
+	useEffect(() => {
+		const videoEl = document.querySelector<HTMLVideoElement>("video");
+		if (videoEl && voiceEnhancerOptions.enabled) {
+			studioVoiceEnhancer.attachToMediaElement(videoEl, voiceEnhancerOptions);
+		} else {
+			studioVoiceEnhancer.updateSettings(voiceEnhancerOptions);
+		}
+	}, [voiceEnhancerOptions, isPreviewReady]);
+
 	return (
 		<div className="flex min-h-0 min-w-0 flex-1 flex-col">
 			<div className="flex min-h-0 flex-1 flex-col">
@@ -168,6 +197,22 @@ export function EditorPreviewPanel(props: Props) {
 								<span className="h-1.5 w-1.5 rounded-full bg-[#2563EB]" />
 							) : null}
 						</Button>
+						<div className="h-4 w-px bg-foreground/20" />
+						<SwissKnifeToolbar
+							spotlightMode={spotlightMode}
+							setSpotlightMode={setSpotlightMode}
+							privacyMasks={privacyMasks}
+							setPrivacyMasks={setPrivacyMasks}
+							chapters={chapters}
+							setChapters={setChapters}
+							currentTime={currentTime}
+							duration={projection.timelineDuration}
+							onSeekToTime={(time) => {
+								playback.handleSeek(time);
+							}}
+							voiceEnhancerOptions={voiceEnhancerOptions}
+							setVoiceEnhancerOptions={setVoiceEnhancerOptions}
+						/>
 					</div>
 					<div
 						className="flex min-h-0 w-full flex-1 items-stretch px-4 py-3"
@@ -224,6 +269,12 @@ export function EditorPreviewPanel(props: Props) {
 										onAnnotationSizeChange:
 											annotationCommands.handleAnnotationSizeChange,
 									}}
+								/>
+								<SpotlightOverlay mode={spotlightMode} />
+								<PrivacyBlurOverlay
+									enabled={true}
+									masks={privacyMasks}
+									onUpdateMasks={setPrivacyMasks}
 								/>
 								<KeystrokeVisualizer
 									enabled={true}

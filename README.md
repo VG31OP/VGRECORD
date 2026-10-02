@@ -44,7 +44,14 @@
 
 ---
 
-## 🌟 Key Highlights & Features
+## 🌟 Key Highlights & Swiss Army Knife Suite
+
+### 🛠️ The Swiss Army Knife Toolset
+- **🔍 Focus Spotlight & Laser Pointer**: Dim surrounding areas with a focused bright circle, activate a neon glowing laser pointer, or engage a circular magnifying lens over cursor hot-spots.
+- **🔲 Privacy Redaction & Blur Masks**: Place draggable and resizable blur/pixelate boxes over credentials, passwords, API tokens, and emails.
+- **⏱️ Auto Chapter Markers & YouTube Timestamps**: Pin timeline timestamps and copy formatted chapters (`00:00 Intro`, `01:25 Setup`) to clipboard with 1 click.
+- **🎙️ Studio Voice AI DSP & Vocal Enhancer**: Real-time Web Audio high-pass rumble filter (80Hz), clarity presence boost (3.5kHz), and broadcast dynamics leveling.
+- **📜 Presenter Studio Teleprompter**: Floating draggable script prompter with variable scroll speeds (1x–5x), mirror mode, and spacebar pause/resume.
 
 ### ⚡ Smart Silence & Dead-Air Auto-Cutter (AI Jump-Cut)
 - One-click dead-air removal: scans speech transcription cues and audio pauses to automatically trim empty silence (>600ms).
