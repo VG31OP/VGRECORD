@@ -44,7 +44,6 @@ import { KeystrokeVisualizer } from "../keystrokes/KeystrokeVisualizer";
 import { detectSilenceGapsFromCues, computeAutoTrimmedClips } from "../timeline/autoSilenceCutter";
 import { toast } from "@/components/ui/toast";
 import { SwissKnifeToolbar } from "../swissknife/SwissKnifeToolbar";
-import { SpotlightOverlay, type SpotlightMode } from "../swissknife/SpotlightOverlay";
 import { PrivacyBlurOverlay, type PrivacyMask } from "../swissknife/PrivacyBlurOverlay";
 import type { ChapterMarker } from "../swissknife/ChapterMarkersModal";
 import {
@@ -132,7 +131,6 @@ export function EditorPreviewPanel(props: Props) {
 	} = props;
 
 	// Swiss Army Knife Suite State
-	const [spotlightMode, setSpotlightMode] = useState<SpotlightMode>("off");
 	const [privacyMasks, setPrivacyMasks] = useState<PrivacyMask[]>([]);
 	const [chapters, setChapters] = useState<ChapterMarker[]>([
 		{ id: "ch_intro", timeSeconds: 0, title: "Introduction" },
@@ -140,6 +138,58 @@ export function EditorPreviewPanel(props: Props) {
 	const [voiceEnhancerOptions, setVoiceEnhancerOptions] = useState<VoiceEnhancerOptions>(
 		DEFAULT_VOICE_ENHANCER_OPTIONS,
 	);
+
+	const handleAutoCutSilences = () => {
+		const duration = projection.timelineDuration;
+		if (!duration || duration <= 0) {
+			toast.error("No active video loaded to auto-cut.");
+			return;
+		}
+		const gaps = detectSilenceGapsFromCues(timeline.autoCaptions, duration, {
+			minSilenceDurationMs: 1200,
+		});
+		if (gaps.length === 0) {
+			toast.info("No long silences detected (>1.2s). Timeline pacing is already clean!");
+			return;
+		}
+		const newClips = computeAutoTrimmedClips(gaps, duration, timeline.clipRegions);
+		timeline.setClipRegions(newClips);
+		toast.success(`Smart Auto-Cut: trimmed ${gaps.length} dead-air pause${gaps.length > 1 ? "s" : ""}!`);
+	};
+
+	const handleCaptureSnapshot = () => {
+		try {
+			const canvas = document.querySelector<HTMLCanvasElement>("div[data-preview-overlay] canvas, .relative canvas");
+			if (canvas) {
+				const dataUrl = canvas.toDataURL("image/png");
+				const link = document.createElement("a");
+				link.download = `VGRECORD-snapshot-${Math.round(currentTime * 100) / 100}s.png`;
+				link.href = dataUrl;
+				link.click();
+				toast.success("Cover snapshot saved as PNG!");
+				return;
+			}
+			const videoEl = document.querySelector<HTMLVideoElement>("video");
+			if (!videoEl) {
+				toast.error("No active video frame to capture.");
+				return;
+			}
+			const offscreen = document.createElement("canvas");
+			offscreen.width = videoEl.videoWidth || 1920;
+			offscreen.height = videoEl.videoHeight || 1080;
+			const ctx = offscreen.getContext("2d");
+			if (!ctx) return;
+			ctx.drawImage(videoEl, 0, 0, offscreen.width, offscreen.height);
+			const dataUrl = offscreen.toDataURL("image/png");
+			const link = document.createElement("a");
+			link.download = `VGRECORD-snapshot-${Math.round(currentTime * 100) / 100}s.png`;
+			link.href = dataUrl;
+			link.click();
+			toast.success("Cover snapshot saved as PNG!");
+		} catch {
+			toast.error("Failed to capture snapshot.");
+		}
+	};
 
 	// Attach / update Web Audio DSP filter
 	useEffect(() => {
@@ -199,8 +249,6 @@ export function EditorPreviewPanel(props: Props) {
 						</Button>
 						<div className="h-4 w-px bg-foreground/20" />
 						<SwissKnifeToolbar
-							spotlightMode={spotlightMode}
-							setSpotlightMode={setSpotlightMode}
 							privacyMasks={privacyMasks}
 							setPrivacyMasks={setPrivacyMasks}
 							chapters={chapters}
@@ -212,6 +260,8 @@ export function EditorPreviewPanel(props: Props) {
 							}}
 							voiceEnhancerOptions={voiceEnhancerOptions}
 							setVoiceEnhancerOptions={setVoiceEnhancerOptions}
+							onAutoCutSilences={handleAutoCutSilences}
+							onCaptureSnapshot={handleCaptureSnapshot}
 						/>
 					</div>
 					<div
@@ -270,7 +320,6 @@ export function EditorPreviewPanel(props: Props) {
 											annotationCommands.handleAnnotationSizeChange,
 									}}
 								/>
-								<SpotlightOverlay mode={spotlightMode} />
 								<PrivacyBlurOverlay
 									enabled={true}
 									masks={privacyMasks}

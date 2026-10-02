@@ -1,12 +1,15 @@
 import { useState } from "react";
 import {
 	Wrench,
-	Crosshair,
 	EyeSlash,
 	Bookmarks,
 	MicrophoneStage,
 	Article,
 	Check,
+	Trash,
+	ShieldCheck,
+	Lightning,
+	Camera,
 } from "@phosphor-icons/react";
 import {
 	DropdownMenu,
@@ -18,15 +21,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import type { SpotlightMode } from "./SpotlightOverlay";
-import type { PrivacyMask } from "./PrivacyBlurOverlay";
+import type { PrivacyMask, BlurType } from "./PrivacyBlurOverlay";
 import { ChapterMarkersModal, type ChapterMarker } from "./ChapterMarkersModal";
 import { TeleprompterModal } from "./TeleprompterModal";
 import type { VoiceEnhancerOptions } from "./StudioVoiceEnhancer";
 
 interface SwissKnifeToolbarProps {
-	spotlightMode: SpotlightMode;
-	setSpotlightMode: (mode: SpotlightMode) => void;
 	privacyMasks: PrivacyMask[];
 	setPrivacyMasks: (masks: PrivacyMask[]) => void;
 	chapters: ChapterMarker[];
@@ -36,11 +36,11 @@ interface SwissKnifeToolbarProps {
 	onSeekToTime: (timeSeconds: number) => void;
 	voiceEnhancerOptions: VoiceEnhancerOptions;
 	setVoiceEnhancerOptions: (opts: VoiceEnhancerOptions) => void;
+	onAutoCutSilences?: () => void;
+	onCaptureSnapshot?: () => void;
 }
 
 export function SwissKnifeToolbar({
-	spotlightMode,
-	setSpotlightMode,
 	privacyMasks,
 	setPrivacyMasks,
 	chapters,
@@ -50,22 +50,65 @@ export function SwissKnifeToolbar({
 	onSeekToTime,
 	voiceEnhancerOptions,
 	setVoiceEnhancerOptions,
+	onAutoCutSilences,
+	onCaptureSnapshot,
 }: SwissKnifeToolbarProps) {
 	const [isChaptersOpen, setIsChaptersOpen] = useState(false);
 	const [isPrompterOpen, setIsPrompterOpen] = useState(false);
 
-	const handleAddPrivacyMask = () => {
-		const newMask: PrivacyMask = {
-			id: `mask_${Date.now()}`,
-			x: 35,
-			y: 40,
-			width: 30,
-			height: 20,
-			blurType: "blur",
-			label: `Mask #${privacyMasks.length + 1}`,
-		};
+	const handleAddPrivacyMask = (type: BlurType = "blur", preset?: "box" | "password" | "banner" | "fullscreen") => {
+		let newMask: PrivacyMask;
+
+		if (preset === "password") {
+			newMask = {
+				id: `mask_${Date.now()}`,
+				x: 30,
+				y: 45,
+				width: 40,
+				height: 8,
+				blurType: "pixelate",
+				label: "Password / Key",
+			};
+		} else if (preset === "banner") {
+			newMask = {
+				id: `mask_${Date.now()}`,
+				x: 10,
+				y: 80,
+				width: 80,
+				height: 15,
+				blurType: "blur",
+				label: "Subtitles / Footer",
+			};
+		} else if (preset === "fullscreen") {
+			newMask = {
+				id: `mask_${Date.now()}`,
+				x: 0,
+				y: 0,
+				width: 100,
+				height: 100,
+				blurType: "blur",
+				label: "Full Screen Blur",
+			};
+		} else {
+			// default floating box
+			newMask = {
+				id: `mask_${Date.now()}`,
+				x: 35,
+				y: 35,
+				width: 30,
+				height: 22,
+				blurType: type,
+				label: `Redaction #${privacyMasks.length + 1}`,
+			};
+		}
+
 		setPrivacyMasks([...privacyMasks, newMask]);
-		toast.success("Added new privacy blur mask. Click & drag to position!");
+		toast.success("Added Privacy Redaction Mask. Click & drag anywhere to reposition!");
+	};
+
+	const handleClearAllMasks = () => {
+		setPrivacyMasks([]);
+		toast.info("Cleared all privacy masks.");
 	};
 
 	const toggleVoiceEnhancer = () => {
@@ -75,7 +118,7 @@ export function SwissKnifeToolbar({
 			enabled: nextState,
 		});
 		if (nextState) {
-			toast.success("Studio Voice Enhancer AI activated (De-Hum + Clarity + Leveler)!");
+			toast.success("Studio Voice Enhancer activated (De-Hum + 3.5kHz Clarity + Dynamic Leveler)!");
 		} else {
 			toast.info("Voice Enhancer bypassed.");
 		}
@@ -88,95 +131,119 @@ export function SwissKnifeToolbar({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 gap-1.5 px-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 border border-indigo-500/30"
+						className="h-7 gap-1.5 px-2.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 border border-indigo-500/30 shadow-sm"
 						title="VGRECORD Swiss Army Knife Suite"
 					>
 						<Wrench className="h-3.5 w-3.5" weight="bold" />
 						<span>Swiss Knife</span>
+						{privacyMasks.length > 0 && (
+							<span className="ml-0.5 rounded-full bg-indigo-500/30 px-1.5 py-0.2 text-[10px] font-mono text-indigo-300">
+								{privacyMasks.length}
+							</span>
+						)}
 					</Button>
 				</DropdownMenuTrigger>
 
-				<DropdownMenuContent align="start" className="w-56 bg-neutral-950 border-neutral-800 text-white shadow-2xl">
-					<DropdownMenuLabel className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
-						Focus & Pointer
+				<DropdownMenuContent align="start" className="w-64 bg-neutral-950/95 border-neutral-800 text-white shadow-2xl backdrop-blur-md">
+					<DropdownMenuLabel className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+						<span>Privacy & Redaction</span>
+						{privacyMasks.length > 0 && (
+							<span className="text-sky-400 font-normal lowercase">
+								{privacyMasks.length} active
+							</span>
+						)}
 					</DropdownMenuLabel>
+
 					<DropdownMenuItem
-						onClick={() => setSpotlightMode(spotlightMode === "spotlight" ? "off" : "spotlight")}
-						className="flex items-center justify-between text-xs cursor-pointer text-neutral-300 hover:text-white"
+						onClick={() => handleAddPrivacyMask("blur", "box")}
+						className="flex items-center gap-2 text-xs cursor-pointer text-neutral-200 hover:text-white"
 					>
-						<span className="flex items-center gap-2">
-							<Crosshair className="w-4 h-4 text-indigo-400" />
-							<span>Focus Spotlight</span>
-						</span>
-						{spotlightMode === "spotlight" && <Check className="w-3.5 h-3.5 text-indigo-400" />}
+						<ShieldCheck className="w-4 h-4 text-sky-400" />
+						<span>+ Add Redaction Box (Floating)</span>
 					</DropdownMenuItem>
 
 					<DropdownMenuItem
-						onClick={() => setSpotlightMode(spotlightMode === "laser" ? "off" : "laser")}
-						className="flex items-center justify-between text-xs cursor-pointer text-neutral-300 hover:text-white"
+						onClick={() => handleAddPrivacyMask("pixelate", "password")}
+						className="flex items-center gap-2 text-xs cursor-pointer text-neutral-200 hover:text-white"
 					>
-						<span className="flex items-center gap-2">
-							<span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse ml-0.5" />
-							<span>Laser Pointer</span>
-						</span>
-						{spotlightMode === "laser" && <Check className="w-3.5 h-3.5 text-red-400" />}
+						<EyeSlash className="w-4 h-4 text-amber-400" />
+						<span>+ Password / Token Strip</span>
 					</DropdownMenuItem>
 
 					<DropdownMenuItem
-						onClick={() => setSpotlightMode(spotlightMode === "magnifier" ? "off" : "magnifier")}
-						className="flex items-center justify-between text-xs cursor-pointer text-neutral-300 hover:text-white"
+						onClick={() => handleAddPrivacyMask("blur", "banner")}
+						className="flex items-center gap-2 text-xs cursor-pointer text-neutral-200 hover:text-white"
 					>
-						<span className="flex items-center gap-2">
-							<span className="text-xs">🔍</span>
-							<span>Magnifying Lens</span>
-						</span>
-						{spotlightMode === "magnifier" && <Check className="w-3.5 h-3.5 text-indigo-400" />}
+						<EyeSlash className="w-4 h-4 text-purple-400" />
+						<span>+ Bottom Banner / Subtitle Censor</span>
 					</DropdownMenuItem>
+
+					{privacyMasks.length > 0 && (
+						<DropdownMenuItem
+							onClick={handleClearAllMasks}
+							className="flex items-center gap-2 text-xs cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/10"
+						>
+							<Trash className="w-4 h-4" />
+							<span>Clear All Redaction Masks</span>
+						</DropdownMenuItem>
+					)}
 
 					<DropdownMenuSeparator className="bg-neutral-800" />
 
 					<DropdownMenuLabel className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
-						Privacy & Audio
+						Audio & Pacing
 					</DropdownMenuLabel>
 					<DropdownMenuItem
-						onClick={handleAddPrivacyMask}
-						className="flex items-center gap-2 text-xs cursor-pointer text-neutral-300 hover:text-white"
-					>
-						<EyeSlash className="w-4 h-4 text-sky-400" />
-						<span>+ Add Privacy Blur Mask</span>
-					</DropdownMenuItem>
-
-					<DropdownMenuItem
 						onClick={toggleVoiceEnhancer}
-						className="flex items-center justify-between text-xs cursor-pointer text-neutral-300 hover:text-white"
+						className="flex items-center justify-between text-xs cursor-pointer text-neutral-200 hover:text-white"
 					>
 						<span className="flex items-center gap-2">
 							<MicrophoneStage className="w-4 h-4 text-emerald-400" />
-							<span>Studio Voice DSP</span>
+							<span>Studio Voice DSP (AI De-Hum)</span>
 						</span>
 						{voiceEnhancerOptions.enabled && <Check className="w-3.5 h-3.5 text-emerald-400" />}
 					</DropdownMenuItem>
 
+					{onAutoCutSilences && (
+						<DropdownMenuItem
+							onClick={onAutoCutSilences}
+							className="flex items-center gap-2 text-xs cursor-pointer text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
+						>
+							<Lightning className="w-4 h-4 text-amber-400" weight="fill" />
+							<span>AI Silence Auto-Cut (Dead-Air)</span>
+						</DropdownMenuItem>
+					)}
+
 					<DropdownMenuSeparator className="bg-neutral-800" />
 
 					<DropdownMenuLabel className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
-						Creator Tools
+						Production & Publishing
 					</DropdownMenuLabel>
 					<DropdownMenuItem
 						onClick={() => setIsChaptersOpen(true)}
-						className="flex items-center gap-2 text-xs cursor-pointer text-neutral-300 hover:text-white"
+						className="flex items-center gap-2 text-xs cursor-pointer text-neutral-200 hover:text-white"
 					>
 						<Bookmarks className="w-4 h-4 text-amber-400" />
-						<span>Chapters & Timestamps</span>
+						<span>YouTube & Loom Chapters</span>
 					</DropdownMenuItem>
 
 					<DropdownMenuItem
 						onClick={() => setIsPrompterOpen(true)}
-						className="flex items-center gap-2 text-xs cursor-pointer text-neutral-300 hover:text-white"
+						className="flex items-center gap-2 text-xs cursor-pointer text-neutral-200 hover:text-white"
 					>
 						<Article className="w-4 h-4 text-purple-400" />
 						<span>Presenter Teleprompter</span>
 					</DropdownMenuItem>
+
+					{onCaptureSnapshot && (
+						<DropdownMenuItem
+							onClick={onCaptureSnapshot}
+							className="flex items-center gap-2 text-xs cursor-pointer text-sky-300 hover:text-sky-200 hover:bg-sky-500/10"
+						>
+							<Camera className="w-4 h-4 text-sky-400" />
+							<span>Capture Cover Thumbnail (PNG)</span>
+						</DropdownMenuItem>
+					)}
 				</DropdownMenuContent>
 			</DropdownMenu>
 
